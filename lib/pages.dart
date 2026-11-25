@@ -479,4 +479,78 @@ class TopicList extends StatefulWidget {
   final Map<String, dynamic> subject;
   const TopicList({super.key, required this.subject});
   @override
-  State<TopicList> createS
+  State<TopicList> createState() => _TopicListState();
+}
+
+class _TopicListState extends State<TopicList> {
+  List<Map<String, dynamic>> topics = [];
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    topics = await AppDb.db.query('topics', where: 'subjectId=?', whereArgs: [widget.subject['id']], orderBy: 'createdAt DESC');
+    if (mounted) setState(() {});
+  }
+
+  String status(Map<String, dynamic> t) {
+    final next = t['nextRevision'] as String?;
+    if (next == null) return 'Not studied yet';
+    final d = daysFromToday(DateTime.parse(next));
+    if (d < 0) return 'Revision overdue ${-d}d';
+    if (d == 0) return 'Revision due today';
+    return 'Next revision: ${DateFormat('MMM d').format(DateTime.parse(next))}';
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(widget.subject['name'] as String)),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () async {
+            if (await topicDialog(context, subjectId: widget.subject['id'] as int)) await load();
+          },
+          child: const Icon(Icons.add),
+        ),
+        body: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+          itemCount: topics.isEmpty ? 1 : topics.length,
+          itemBuilder: (_, i) {
+            if (topics.isEmpty) return const EmptyState(Icons.library_add_outlined, 'No topics yet. Tap + to add one.');
+            final t = topics[i];
+            final next = t['nextRevision'] as String?;
+            final overdue = next != null && daysFromToday(DateTime.parse(next)) <= 0;
+            final notes = (t['notes'] as String?) ?? '';
+            final rc = (t['revisionCount'] as int?) ?? 0;
+            return Panel(
+              onTap: () async {
+                if (await topicDialog(context, subjectId: widget.subject['id'] as int, topic: t)) await load();
+              },
+              child: Row(children: [
+                IconBadge(next == null ? Icons.fiber_new_outlined : (overdue ? Icons.refresh_rounded : Icons.check_circle_outline),
+                    next == null ? C.accent : (overdue ? C.orange : C.green)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t['title'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 3),
+                    Text(status(t), style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                    if (notes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(notes, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ]),
+                ),
+                if (next != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                    child: Text('R$rc', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  ),
+              ]),
+            );
+          },
+        ),
+      );
+}
