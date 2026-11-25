@@ -1,45 +1,24 @@
-name: Build APK
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main, master ]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Find project
-        run: |
-          F=$(find . -name pubspec.yaml -not -path './.*' -not -path '*/.*/*' | head -1)
-          if [ -z "$F" ]; then echo "No pubspec.yaml in repo. Upload it."; exit 1; fi
-          echo "APP_DIR=$(dirname "$F")" >> $GITHUB_ENV
-          echo "Project: $(dirname "$F")"
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.5'
-          channel: stable
-          cache: true
-      - name: Generate Android scaffold
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          flutter create --platforms=android --org com.example --project-name recursive_study /tmp/scaffold
-          rm -rf android
-          cp -r /tmp/scaffold/android android
-          sed -i 's/sourceCompatibility = JavaVersion.VERSION_1_8/coreLibraryDesugaringEnabled true\n        sourceCompatibility = JavaVersion.VERSION_1_8/' android/app/build.gradle
-          printf '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n' >> android/app/build.gradle
-          sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application#' android/app/src/main/AndroidManifest.xml
-          sed -i 's#android:label="recursive_study"#android:label="Recursive Study"#' android/app/src/main/AndroidManifest.xml
-      - name: Pub get
-        working-directory: ${{ env.APP_DIR }}
-        run: flutter pub get
-      - name: Build APK
-        working-directory: ${{ env.APP_DIR }}
-        run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: recursive-study-apk
-          path: ${{ env.APP_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+name: recursive_study
+description: Offline recursive study planner and timer.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  flutter_local_notifications: ^17.2.2
+  shared_preferences: ^2.3.2
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
